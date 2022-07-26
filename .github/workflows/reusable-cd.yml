@@ -1,0 +1,155 @@
+#use https://github.com/nektos/act for local test
+
+name: Reusable CD
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+        default: dev
+        description: dev, qa, uat, staging or prod
+      imageTag:
+        required: true
+        type: string
+        description: image tag to deploy
+      awsRegion:
+        required: false
+        type: string
+        default: eu-west-2
+      ecsServiceName:
+        required: false
+        type: string
+        description: name of ECS service & task definiton for deployment, will use repo name by default
+      waitForServiceStability:
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      awsAccessKey:
+        required: true
+      awsSecretKey:
+        required: true
+      rollbarToken:
+        required: true
+
+env:
+  ENV: ${{ inputs.env }}
+  ROLLBAR_ACCESS_TOKEN: ${{ secrets.rollbarToken }}
+  ROLLBAR_USERNAME: ${{ github.actor }}
+
+jobs:
+  setup:
+    name: setup & get current deployment info
+    runs-on: ubuntu-latest
+    outputs:
+      repo: ${{ steps.setupVars.outputs.repo }}
+      service: ${{ steps.setupVars.outputs.service }}
+
+      taskRevision: ${{ steps.currentTask.outputs.revision }}
+      taskImage: ${{ steps.currentTask.outputs.image }}
+
+    steps:
+      - name: Prepare ENV vars
+        id: setupVars
+        run: |
+
+          if [[ "$ENV" =~ ^(dev|qa|uat|staging|prod)$ ]]; then
+              echo "environment key=$ENV"
+          else
+            echo "unsupported environment=$ENV for task deployment"
+            exit 1
+          fi
+
+          if [[ -z "${{ inputs.ecsServiceName }}" ]]; then
+            SERVICE_NAME=${GITHUB_REPOSITORY#*/}
+          else
+            SERVICE_NAME=${{ inputs.ecsServiceName }}
+          fi
+
+          echo "::set-output name=repo::${GITHUB_REPOSITORY,,}"
+          echo "::set-output name=service::${SERVICE_NAME}"
+
+          echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo "SERVICE_NAME=${SERVICE_NAME}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.awsAccessKey }}
+          aws-secret-access-key: ${{ secrets.awsSecretKey }}
+          aws-region: ${{ inputs.awsRegion }}
+
+      - name: Get current task definition info
+        id: currentTask
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.SERVICE_NAME }} \
+            --query taskDefinition > task-definition.json
+
+          echo "::set-output name=revision::$(cat task-definition.json | jq .revision)"
+          echo "::set-output name=image::$(cat task-definition.json | jq .containerDefinitions[0].image)"
+
+  deploy-task:
+    name: image deploy
+    if: ${{ !endsWith( needs.setup.outputs.taskImage, inputs.imageTag ) }}
+    needs: setup
+    runs-on: ubuntu-latest
+    env:
+      SERVICE_NAME: ${{ needs.setup.outputs.service }}
+      REPO: ${{ needs.setup.outputs.repo }}
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.awsAccessKey }}
+          aws-secret-access-key: ${{ secrets.awsSecretKey }}
+          aws-region: ${{ inputs.awsRegion }}
+
+      - name: Download task definition
+        id: download-task
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition ${{ env.SERVICE_NAME }} \
+            --query taskDefinition > task-definition.json
+
+          echo "::set-output name=revision::$(($(cat task-definition.json | jq .revision) - 2))"
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.SERVICE_NAME }}
+          image: ghcr.io/${{ env.REPO }}:${{ inputs.imageTag }}
+
+      - name: Notify start deploy to Rollbar
+        uses: rollbar/github-deploy-action@2.1.1
+        id: rollbar_pre_deploy
+        with:
+          environment: ${{ env.ENV }}
+          version: ${{ inputs.imageTag }}
+          status: 'started'
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.SERVICE_NAME }}
+          cluster: ecs-${{ env.ENV }}
+          wait-for-service-stability: ${{ inputs.waitForServiceStability }}
+
+      - name: De-register (latest-1) revision
+        if: ${{ steps.download-task.outputs.revision > 0 }}
+        run: |
+          aws ecs deregister-task-definition \
+            --task-definition  ${{ env.SERVICE_NAME }}:${{ steps.download-task.outputs.revision }}
+
+      - name: Notify finish deploy to Rollbar
+        uses: rollbar/github-deploy-action@2.1.1
+        id: rollbar_post_deploy
+        with:
+          environment: ${{ env.ENV }}
+          version: ${{ inputs.imageTag }}
+          status: 'succeeded'
