@@ -6,5 +6,7 @@ For more details on how to reuse the workflows pls follow to [GitHub Actions Doc
 
 ## Versioning
 * You should reuse only workflows only by release git tags. Tags with their versions and releases created automatically using https://github.com/mathieudutour/github-tag-action.
-* It highly recommended following commit message convention for creating right versions automatically. See https://github.com/mathieudutour/github-tag-action#bumping 
+* It highly recommended following commit message convention for creating right versions automatically. See 
+  * https://github.com/mathieudutour/github-tag-action#bumping
+  * https://github.com/semantic-release/semantic-release
 

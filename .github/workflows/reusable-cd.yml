@@ -46,10 +46,7 @@ jobs:
     outputs:
       repo: ${{ steps.setupVars.outputs.repo }}
       service: ${{ steps.setupVars.outputs.service }}
-
-      taskRevision: ${{ steps.currentTask.outputs.revision }}
-      taskImage: ${{ steps.currentTask.outputs.image }}
-
+      currentTaskImage: ${{ steps.currentTask.outputs.image }}
     steps:
       - name: Prepare ENV vars
         id: setupVars
@@ -88,12 +85,12 @@ jobs:
             --task-definition ${{ env.SERVICE_NAME }} \
             --query taskDefinition > task-definition.json
 
-          echo "::set-output name=revision::$(cat task-definition.json | jq .revision)"
           echo "::set-output name=image::$(cat task-definition.json | jq .containerDefinitions[0].image)"
 
   deploy-task:
     name: image deploy
-    if: ${{ !endsWith( needs.setup.outputs.taskImage, inputs.imageTag ) }}
+    #deploy only if image's tag changes
+    if: ${{ !endsWith( needs.setup.outputs.currentTaskImage, inputs.imageTag ) }}
     needs: setup
     runs-on: ubuntu-latest
     env:
@@ -115,6 +112,16 @@ jobs:
             --query taskDefinition > task-definition.json
 
           echo "::set-output name=revision::$(($(cat task-definition.json | jq .revision) - 2))"
+
+          cat task-definition.json | jq -r 'del(
+            .taskDefinitionArn,
+            .requiresAttributes,
+            .compatibilities,
+            .revision,
+            .status,
+            .registeredAt,
+            .registeredBy
+          )' > task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
