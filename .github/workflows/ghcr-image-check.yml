@@ -1,0 +1,38 @@
+on:
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    outputs:
+      imageExists:
+        description: "Returns true or false based on if Docker image exists or not for the caller repo"
+        value: ${{ jobs.check.outputs.imageExists }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      imageExists: ${{ steps.ghcrResponse.outputs.imageExists }}
+    steps:
+      - name: GHCR request preparations
+        id: ghcrRequest
+        run: |
+          echo "::set-output name=ghcrUrl::$(echo "https://ghcr.io/v2/${GITHUB_REPOSITORY,,}/manifests/${{ inputs.tag }}")"
+          echo "::set-output name=tokenBase64::$(echo ${{ secrets.GITHUB_TOKEN }} | base64)"
+
+      - name: Making request to GHCR
+        id: ghcrResponse
+        run: |
+          http_response=$(curl -H "Authorization: Bearer ${{ steps.ghcrRequest.outputs.tokenBase64 }}" -s -o response.txt -w "%{http_code}" ${{ steps.ghcrRequest.outputs.ghcrUrl }})
+          if [ $http_response == "404" ]; then
+              echo "Docker image does not exist"
+              echo "::set-output name=imageExists::false"
+          elif [ $http_response == "200" ]; then
+              echo "Docker image exists"
+              echo "::set-output name=imageExists::true"
+          else
+              echo "GHCR responded with neither 200 or 404 code"
+              echo $(cat response.txt)
+              exit 1
+          fi
