@@ -18,7 +18,7 @@ jobs:
       - name: GHCR request preparations
         id: ghcrRequest
         run: |
-          echo "::set-output name=ghcrUrl::$(echo "https://ghcr.io/v2/${GITHUB_REPOSITORY,,}/manifests/${{ input.tag }}")"
+          echo "::set-output name=ghcrUrl::$(echo "https://ghcr.io/v2/${GITHUB_REPOSITORY,,}/manifests/${{ inputs.tag }}")"
           echo "::set-output name=tokenBase64::$(echo ${{ secrets.GITHUB_TOKEN }} | base64)"
 
       - name: Making request to GHCR
