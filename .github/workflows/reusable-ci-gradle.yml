@@ -39,9 +39,6 @@ jobs:
           java-version: '11'
           cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
-
       - name: Compile Java
         env:
           GITHUB_TOKEN: ${{ secrets.MAVEN_GITHUB_TOKEN }}
