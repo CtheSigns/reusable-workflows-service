@@ -1,0 +1,124 @@
+#use https://github.com/nektos/act for local test
+#workflow run Continuous Integration on the callers branch
+
+name: Reusable CI
+
+on:
+  workflow_call:
+    inputs:
+      skipTests:
+        required: false
+        default: false
+        type: boolean
+        description: skip tests
+      skipImage:
+        required: false
+        default: false
+        type: boolean
+        description: skip image
+      imageTag:
+        required: false
+        type: string
+        description: additional image tag besides default commit hash
+    secrets:
+      MAVEN_GITHUB_TOKEN:
+        required: true
+        description: GitHub token with permissions to read Maven GitHub packages
+
+jobs:
+  compile:
+    name: compilation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+          cache: gradle
+
+      - name: Compile Java
+        env:
+          GITHUB_TOKEN: ${{ secrets.MAVEN_GITHUB_TOKEN }}
+        run: ./gradlew clean compileJava
+
+  test:
+    name: running tests
+    if: ${{ !inputs.skipTests || !inputs.skipImage }}
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+          cache: gradle
+
+      - name: Start MongoDB
+        uses: supercharge/mongodb-github-action@1.7.0
+        with:
+          mongodb-version: '4.4'
+
+      - name: Caching /build/*
+        uses: actions/cache@v3
+        with:
+          path: |
+            build/generated-docs
+            build/libs
+          key: ${{ github.repository }}-build-${{ github.sha }}
+
+      - name: Run tests & build
+        run: ./gradlew test build
+        env:
+          GITHUB_TOKEN: ${{ secrets.MAVEN_GITHUB_TOKEN }}
+
+  image:
+    name: image build & push
+    if: ${{ !inputs.skipImage }}
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Prepare ENV vars
+        run: |
+          echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+          cache: gradle
+
+      - name: Restoring cache /build/*
+        uses: actions/cache@v3
+        with:
+          path: |
+            build/generated-docs
+            build/libs
+          key: ${{ github.repository }}-build-${{ github.sha }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image build & push
+        uses: docker/build-push-action@v3
+        env:
+          TAG: ${{ inputs.imageTag != '' && inputs.imageTag || github.sha }}
+          COMMIT_HASH: ${{ github.sha }}
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ env.REPO_NAME }}:${{ env.COMMIT_HASH }},ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}
+          build-args: JAR_FILE=${{ env.IMAGE_NAME }}.jar
