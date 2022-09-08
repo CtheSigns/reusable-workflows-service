@@ -94,7 +94,7 @@ jobs:
           mongodb-version: '4.4'
 
       - name: Run tests
-        run: mvn -Ddockerfile.skip=true -Dspring.profiles.active=test verify
+        run: mvn -Dspring.profiles.active=test verify
 
       - name: Cache tested ./target
         uses: actions/cache@v3
