@@ -1,0 +1,93 @@
+#use https://github.com/nektos/act for local test
+#workflow run Continuous Integration on the callers branch
+name: Reusable CI
+
+on:
+  workflow_call:
+    inputs:
+      skipTests:
+        required: false
+        default: false
+        type: boolean
+        description: skip tests
+      skipImage:
+        required: false
+        default: false
+        type: boolean
+        description: skip image
+      imageTag:
+        required: false
+        type: string
+        description: additional image tag besides default commit hash
+    secrets:
+
+jobs:
+  compile_and_test:
+    name: compilation and test
+    runs-on: ubuntu-latest
+         
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup .NET Core SDK 6
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.x'
+        
+      - name: Install dependencies
+        run: dotnet restore
+        
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+        
+      - name: Test
+        if: ${{ !inputs.skipTests || !inputs.skipImage }}
+        run: dotnet test --no-restore --verbosity normal
+      
+      - name: Publish
+        if: ${{ !inputs.skipTests || !inputs.skipImage }}
+        run: dotnet publish -c Release --output ./release
+        
+      - name: Caching published dotnet app   
+        uses: actions/cache@v3
+        with:
+            path: ./release
+            # Look to see if there is a cache hit for the corresponding requirements file
+            key: ${{ github.repository }}-release-${{ github.sha }}
+
+  image:
+    name: image build & push
+    if: ${{ !inputs.skipimage }}
+    needs: compile_and_test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Prepare ENV vars
+        run: |
+          echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: restore dotnet app cache
+        uses: actions/cache@v3
+        with:
+          path: ./release
+          key: ${{ github.repository }}-release-${{ github.sha }}
+            
+      - name: image build & push
+        env:
+          tag: ${{ inputs.imagetag }}
+          commit_hash: ${{ github.sha }}
+        run: |
+          docker build . \
+            -t ghcr.io/$REPO_NAME:$COMMIT_HASH \
+            -t ghcr.io/$REPO_NAME:$TAG \
+            
+          docker push ghcr.io/$REPO_NAME --all-tags
