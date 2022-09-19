@@ -19,7 +19,6 @@ on:
         required: false
         type: string
         description: additional image tag besides default commit hash
-    secrets:
 
 jobs:
   compile_and_test:
