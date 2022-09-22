@@ -1,0 +1,62 @@
+name: Reusable Library Publish
+
+on:
+  workflow_call:
+    inputs:
+      packageName:
+        required: true
+        type: string
+        description: Package name
+    secrets:
+      MAVEN_GITHUB_TOKEN:
+        required: true
+        description: GitHub token with permissions to read Maven GitHub packages
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+          cache: gradle
+
+      - name: Validate Gradle wrapper
+        uses: gradle/wrapper-validation-action@v1
+
+      - name: Publish package
+        uses: gradle/gradle-build-action
+        with:
+          arguments: publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.MAVEN_GITHUB_TOKEN }}
+
+      - name: Keeping only last 10 pre-releases
+        uses: actions/delete-package-versions@v3
+        with:
+          package-name: ${{ inputs.packageName }}
+          min-versions-to-keep: 10
+          delete-only-pre-release-versions: "true"
+
+  tag:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get version from gradle project
+        id: gradle-version
+        run: |
+          POM_VERSION=$(gradle properties -q | grep "version:" | awk '{print $2}')
+          echo "::set-output name=version::${POM_VERSION}"
+
+      - name: Create and push versioned Git tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          custom_tag: ${{ steps.gradle-version.outputs.version }}
