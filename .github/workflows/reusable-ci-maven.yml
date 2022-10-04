@@ -163,7 +163,7 @@ jobs:
           COMMIT_HASH: ${{ github.sha }}
         run: |
 
-          IFS=', ' read -r -a IMAGE_TAGS <<< "INPUT_TAGS"
+          IFS=', ' read -r -a IMAGE_TAGS <<< "$INPUT_TAGS"
 
           TAGS=""
           for TAG in "${IMAGE_TAGS[@]}"
