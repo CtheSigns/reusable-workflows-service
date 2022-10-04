@@ -19,7 +19,11 @@ on:
       imageTag:
         required: false
         type: string
-        description: additional image tag besides default commit hash
+        description: DEPRECATED - use imageTags
+      imageTags:
+        required: false
+        type: string
+        description: image tag(s), in addition to the default commit hash, separated by ', '
     secrets:
       MAVEN_GITHUB_TOKEN:
         required: true
@@ -87,6 +91,25 @@ jobs:
 
       - name: Prepare ENV vars
         run: |
+          INPUT_TAGS="${{ github.sha }}"
+
+          if [[ ! -z "${{ inputs.imageTag }}" ]]; then
+              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTag }}"
+          fi
+
+          if [[ ! -z "${{ inputs.imageTags }}" ]]; then
+              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTags }}"
+          fi
+
+          IFS=', ' read -r -a IMAGE_TAGS <<< "$INPUT_TAGS"
+
+          TAGS=""
+          for TAG in "${IMAGE_TAGS[@]}"
+          do
+             TAGS="${TAGS},ghcr.io/$REPO_NAME:$TAG"
+          done
+
+          echo "IMAGE_TAGS=${TAGS}" >> $GITHUB_ENV
           echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
           echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
 
@@ -120,5 +143,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ env.REPO_NAME }}:${{ env.COMMIT_HASH }},ghcr.io/${{ env.REPO_NAME }}:${{ env.TAG }}
+          tags: ${{ env.IMAGE_TAGS }}
           build-args: JAR_FILE=${{ env.IMAGE_NAME }}.jar
