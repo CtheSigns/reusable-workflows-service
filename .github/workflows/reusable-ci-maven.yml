@@ -118,11 +118,11 @@ jobs:
         run: |
           INPUT_TAGS="${{ github.sha }}"
 
-          if [[ -z "${{ inputs.imageTag }}" ]]; then
+          if [[ ! -z "${{ inputs.imageTag }}" ]]; then
               INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTag }}"
           fi
 
-          if [[ -z "${{ inputs.imageTags }}" ]]; then
+          if [[ ! -z "${{ inputs.imageTags }}" ]]; then
               INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTags }}"
           fi
 
