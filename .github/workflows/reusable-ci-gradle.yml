@@ -106,7 +106,7 @@ jobs:
           TAGS=""
           for TAG in "${IMAGE_TAGS[@]}"
           do
-             TAGS="${TAGS},ghcr.io/$REPO_NAME:$TAG"
+             TAGS="${TAGS},ghcr.io/${GITHUB_REPOSITORY,,}:$TAG"
           done
 
           echo "IMAGE_TAGS=${TAGS}" >> $GITHUB_ENV
