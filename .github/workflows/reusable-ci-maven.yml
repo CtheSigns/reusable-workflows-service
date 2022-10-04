@@ -19,7 +19,11 @@ on:
       imageTag:
         required: false
         type: string
-        description: additional image tag besides default commit hash
+        description: DEPRECATED - use imageTags
+      imageTags:
+        required: false
+        type: string
+        description: image tag(s), in addition to the default commit hash, separated by ', '
     secrets:
       MAVEN_GITHUB_TOKEN:
         required: true
@@ -112,6 +116,17 @@ jobs:
 
       - name: Prepare ENV vars
         run: |
+          INPUT_TAGS="${{ github.sha }}"
+
+          if [[ ! -z "${{ inputs.imageTag }}" ]]; then
+              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTag }}"
+          fi
+
+          if [[ ! -z "${{ inputs.imageTags }}" ]]; then
+              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTags }}"
+          fi
+
+          echo "INPUT_TAGS=${INPUT_TAGS}" >> $GITHUB_ENV
           echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
           echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
 
@@ -148,11 +163,16 @@ jobs:
           COMMIT_HASH: ${{ github.sha }}
         run: |
 
-          [ -z "$TAG" ] && TAG=$COMMIT_HASH
+          IFS=', ' read -r -a IMAGE_TAGS <<< "$INPUT_TAGS"
+
+          TAGS=""
+          for TAG in "${IMAGE_TAGS[@]}"
+          do
+             TAGS="${TAGS} -t ghcr.io/$REPO_NAME:$TAG"
+          done
 
           docker build . \
-            -t ghcr.io/$REPO_NAME:$COMMIT_HASH \
-            -t ghcr.io/$REPO_NAME:$TAG \
+            ${TAGS} \
             --build-arg JAR_FILE=$IMAGE_NAME.jar
 
           docker push ghcr.io/$REPO_NAME --all-tags
