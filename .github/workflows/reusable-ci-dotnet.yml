@@ -18,11 +18,15 @@ on:
       imageTag:
         required: false
         type: string
-        description: additional image tag besides default commit hash
+        description: DEPRECATED - use imageTags
+      imageTags:
+        required: false
+        type: string
+        description: image tag(s), in addition to the default commit hash, separated by ', '
 
 jobs:
-  compile_and_test:
-    name: compilation and test
+  compile:
+    name: compilation
     runs-on: ubuntu-latest
          
     steps:
@@ -34,36 +38,87 @@ jobs:
           dotnet-version: '6.x'
         
       - name: Install dependencies
-        run: dotnet restore
-        
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
-        
-      - name: Test
-        if: ${{ !inputs.skipTests || !inputs.skipImage }}
-        run: dotnet test --no-restore --verbosity normal
-      
-      - name: Publish
-        if: ${{ !inputs.skipTests || !inputs.skipImage }}
-        run: dotnet publish -c Release --output ./release
-        
-      - name: Caching published dotnet app   
+        run: dotnet restore --packages ./packages
+
+      - name: Cache Nuget
         uses: actions/cache@v3
         with:
-            path: ./release
-            # Look to see if there is a cache hit for the corresponding requirements file
-            key: ${{ github.repository }}-release-${{ github.sha }}
+          path: ./packages
+          key: ${{ github.repository }}-dependencies-${{ github.sha }}
+          restore-keys: |
+            ${{ github.repository }}-dependencies-
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore --output ./target --source ./packages
+      
+      - name: Cache compiled ./target
+        uses: actions/cache@v3
+        with:
+          path: ./target
+          key: ${{ github.repository }}-compiled_target-${{ github.sha }}
+
+      - name: Publish
+        run: dotnet publish -c Release --output ./release --source ./packages
+
+  test:
+    name: running tests
+    if: ${{ !inputs.skipTests || !inputs.skipImage }}
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup .NET Core SDK 6
+        uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.x'
+
+      - name: Restore Nuget cache
+        uses: actions/cache@v3
+        with:
+          path: ./packages
+          key: ${{ github.repository }}-dependencies-${{ github.sha }}
+          restore-keys: |
+            ${{ github.repository }}-dependencies-
+      
+      - name: Restore compiled ./target cache
+        uses: actions/cache@v3
+        with:
+          path: ./target
+          key: ${{ github.repository }}-compiled_target-${{ github.sha }}
+      
+      - name: Install/Restore dependencies
+        run: dotnet restore --packages ./packages
+      
+      - name: Test
+        run: dotnet test --no-restore --verbosity normal    
 
   image:
     name: image build & push
     if: ${{ !inputs.skipimage }}
-    needs: compile_and_test
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       
       - name: Prepare ENV vars
         run: |
+          INPUT_TAGS="${{ github.sha }}"
+          
+          if [[ ! -z "${{ inputs.imageTag }}" ]]; then
+              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTag }}"
+          fi
+          if [[ ! -z "${{ inputs.imageTags }}" ]]; then
+              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTags }}"
+          fi
+          IFS=', ' read -r -a IMAGE_TAGS <<< "$INPUT_TAGS"
+          TAGS=""
+          for TAG in "${IMAGE_TAGS[@]}"
+          do
+             TAGS="${TAGS},ghcr.io/${GITHUB_REPOSITORY,,}:$TAG"
+          done
+          
+          echo "IMAGE_TAGS=${TAGS}" >> $GITHUB_ENV
           echo "REPO_NAME=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
           echo "IMAGE_NAME=${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
 
@@ -73,20 +128,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: restore dotnet app cache
-        uses: actions/cache@v3
-        with:
-          path: ./release
-          key: ${{ github.repository }}-release-${{ github.sha }}
-            
-      - name: image build & push
+           
+      - name: Image build & push
+        uses: docker/build-push-action@v3
         env:
-          tag: ${{ inputs.imagetag }}
-          commit_hash: ${{ github.sha }}
-        run: |
-          docker build . \
-            -t ghcr.io/$REPO_NAME:$COMMIT_HASH \
-            -t ghcr.io/$REPO_NAME:$TAG \
-            
-          docker push ghcr.io/$REPO_NAME --all-tags
+          TAG: ${{ inputs.imageTag != '' && inputs.imageTag || github.sha }}
+          COMMIT_HASH: ${{ github.sha }}
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_TAGS }}
