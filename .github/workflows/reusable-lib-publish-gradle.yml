@@ -53,8 +53,8 @@ jobs:
       - name: Get version from gradle project
         id: gradle-version
         run: |
-          POM_VERSION=$(gradle properties -q | grep "version:" | awk '{print $2}')
-          echo "::set-output name=version::${POM_VERSION}"
+          BUILD_VERSION=$(gradle properties -q | grep "version:" | awk '{print $2}')
+          echo "::set-output name=version::${BUILD_VERSION}"
 
       - name: Create and push versioned Git tag
         id: tag_version
