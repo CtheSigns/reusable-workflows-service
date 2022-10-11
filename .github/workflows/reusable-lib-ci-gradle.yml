@@ -1,0 +1,58 @@
+name: Reusable Library CI
+
+on:
+  workflow_call:
+    inputs:
+      skipTests:
+        required: false
+        default: false
+        type: boolean
+        description: skip tests
+    secrets:
+      MAVEN_GITHUB_TOKEN:
+        required: true
+        description: GitHub token with permissions to read Maven GitHub packages
+
+jobs:
+  compile:
+    name: compilation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+          cache: gradle
+
+      - name: Compile Java
+        env:
+          GITHUB_TOKEN: ${{ secrets.MAVEN_GITHUB_TOKEN }}
+        run: ./gradlew clean compileJava
+
+  test:
+    name: running tests
+    if: ${{ !inputs.skipTests }}
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'microsoft'
+          java-version: '11'
+          cache: gradle
+
+      - name: Start MongoDB
+        uses: supercharge/mongodb-github-action@1.7.0
+        with:
+          mongodb-version: '4.4'
+
+      - name: Run tests & build
+        run: ./gradlew test build
+        env:
+          GITHUB_TOKEN: ${{ secrets.MAVEN_GITHUB_TOKEN }}
