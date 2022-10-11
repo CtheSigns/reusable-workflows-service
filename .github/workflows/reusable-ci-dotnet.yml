@@ -15,10 +15,6 @@ on:
         default: false
         type: boolean
         description: skip image
-      imageTag:
-        required: false
-        type: string
-        description: DEPRECATED - use imageTags
       imageTags:
         required: false
         type: string
@@ -105,9 +101,6 @@ jobs:
         run: |
           INPUT_TAGS="${{ github.sha }}"
           
-          if [[ ! -z "${{ inputs.imageTag }}" ]]; then
-              INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTag }}"
-          fi
           if [[ ! -z "${{ inputs.imageTags }}" ]]; then
               INPUT_TAGS="${INPUT_TAGS}, ${{ inputs.imageTags }}"
           fi
@@ -132,7 +125,6 @@ jobs:
       - name: Image build & push
         uses: docker/build-push-action@v3
         env:
-          TAG: ${{ inputs.imageTag != '' && inputs.imageTag || github.sha }}
           COMMIT_HASH: ${{ github.sha }}
         with:
           context: .
