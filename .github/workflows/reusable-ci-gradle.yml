@@ -24,6 +24,11 @@ on:
         required: false
         type: string
         description: image tag(s), in addition to the default commit hash, separated by ', '
+      javaVersion:
+        required: false
+        type: string
+        default: '11'
+        description: java version to use
     secrets:
       MAVEN_GITHUB_TOKEN:
         required: true
@@ -40,7 +45,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'microsoft'
-          java-version: '11'
+          java-version: ${{ inputs.javaVersion }}
           cache: gradle
 
       - name: Compile Java
@@ -60,7 +65,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'microsoft'
-          java-version: '11'
+          java-version: ${{ inputs.javaVersion }}
           cache: gradle
 
       - name: Start MongoDB
@@ -117,7 +122,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'microsoft'
-          java-version: '11'
+          java-version: ${{ inputs.javaVersion }}
           cache: gradle
 
       - name: Restoring cache /build/*
