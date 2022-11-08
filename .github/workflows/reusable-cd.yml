@@ -51,7 +51,6 @@ jobs:
       - name: Prepare ENV vars
         id: setupVars
         run: |
-# todo do we need this check? Amazon will fail itself for unsupported environment
           if [[ "$ENV" =~ ^(dev|dev-us|qa|uat|staging|prod|prod-us)$ ]]; then
               echo "environment key=$ENV"
           else
