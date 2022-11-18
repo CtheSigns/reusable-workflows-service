@@ -63,7 +63,7 @@ jobs:
           fi
 
           if [[ -z "${{ inputs.ecsClusterName }}" ]]; then
-            ECS_CLUSTER_NAME= ecs-${ENV}
+            ECS_CLUSTER_NAME=ecs-${ENV}
           else
             ECS_CLUSTER_NAME=${{ inputs.ecsClusterName }}
           fi
