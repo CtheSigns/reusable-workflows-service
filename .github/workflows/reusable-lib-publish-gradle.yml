@@ -58,7 +58,7 @@ jobs:
 
       - name: Create and push versioned Git tag
         id: tag_version
-        uses: mathieudutour/github-tag-action@v6.0
+        uses: mathieudutour/github-tag-action@v6.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           custom_tag: ${{ steps.gradle-version.outputs.version }}
