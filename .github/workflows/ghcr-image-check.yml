@@ -18,8 +18,8 @@ jobs:
       - name: GHCR request preparations
         id: ghcrRequest
         run: |
-          echo "::set-output name=ghcrUrl::$(echo "https://ghcr.io/v2/${GITHUB_REPOSITORY,,}/manifests/${{ inputs.tag }}")"
-          echo "::set-output name=tokenBase64::$(echo ${{ secrets.GITHUB_TOKEN }} | base64)"
+          echo "ghcrUrl=$(echo "https://ghcr.io/v2/${GITHUB_REPOSITORY,,}/manifests/${{ inputs.tag }}")" >> $GITHUB_OUTPUT
+          echo "tokenBase64=$(echo ${{ secrets.GITHUB_TOKEN }} | base64)" >> $GITHUB_OUTPUT
 
       - name: Making request to GHCR
         id: ghcrResponse
@@ -27,10 +27,10 @@ jobs:
           http_response=$(curl -H "Authorization: Bearer ${{ steps.ghcrRequest.outputs.tokenBase64 }}" -s -o response.txt -w "%{http_code}" ${{ steps.ghcrRequest.outputs.ghcrUrl }})
           if [ $http_response == "404" ]; then
               echo "Docker image does not exist"
-              echo "::set-output name=imageExists::false"
+              echo "imageExists=false" >> $GITHUB_OUTPUT
           elif [ $http_response == "200" ]; then
               echo "Docker image exists"
-              echo "::set-output name=imageExists::true"
+              echo "imageExists=true" >> $GITHUB_OUTPUT
           else
               echo "GHCR responded with neither 200 or 404 code"
               echo $(cat response.txt)

@@ -65,8 +65,8 @@ jobs:
             SERVICE_NAME=${{ inputs.ecsServiceName }}
           fi
 
-          echo "::set-output name=repo::${GITHUB_REPOSITORY,,}"
-          echo "::set-output name=service::${SERVICE_NAME}"
+          echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+          echo "service=${SERVICE_NAME}" >> $GITHUB_OUTPUT
 
           echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
           echo "SERVICE_NAME=${SERVICE_NAME}" >> $GITHUB_ENV
@@ -85,7 +85,7 @@ jobs:
             --task-definition ${{ env.SERVICE_NAME }} \
             --query taskDefinition > task-definition.json
 
-          echo "::set-output name=image::$(cat task-definition.json | jq .containerDefinitions[0].image)"
+          echo "image=$(cat task-definition.json | jq .containerDefinitions[0].image)" >> $GITHUB_OUTPUT
 
   deploy-task:
     name: image deploy
@@ -111,7 +111,7 @@ jobs:
             --task-definition ${{ env.SERVICE_NAME }} \
             --query taskDefinition > task-definition.json
 
-          echo "::set-output name=revision::$(($(cat task-definition.json | jq .revision) - 2))"
+          echo "revision=$(($(cat task-definition.json | jq .revision) - 2))" >> $GITHUB_OUTPUT
 
           echo $(cat task-definition.json | jq 'del(
                   .taskDefinitionArn,
