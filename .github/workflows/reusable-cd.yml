@@ -18,10 +18,14 @@ on:
         required: false
         type: string
         default: eu-west-2
+      ecsClusterName:
+        required: false
+        type: string
+        description: name of ECS cluster for deployment, will use ecs- as prefix and environment name as suffix by default
       ecsServiceName:
         required: false
         type: string
-        description: name of ECS service & task definiton for deployment, will use repo name by default
+        description: name of ECS service & task definition for deployment, will use repo name by default
       waitForServiceStability:
         required: false
         type: boolean
@@ -51,11 +55,17 @@ jobs:
       - name: Prepare ENV vars
         id: setupVars
         run: |
-          if [[ "$ENV" =~ ^(dev|dev-us|qa|uat|staging|prod|prod-us)$ ]]; then
+          if [[ "$ENV" =~ ^(dev|qa|uat|staging|prod)$ ]]; then
               echo "environment key=$ENV"
           else
             echo "unsupported environment=$ENV for task deployment"
             exit 1
+          fi
+
+          if [[ -z "${{ inputs.ecsClusterName }}" ]]; then
+            ECS_CLUSTER_NAME= ecs-${ENV}
+          else
+            ECS_CLUSTER_NAME=${{ inputs.ecsClusterName }}
           fi
 
           if [[ -z "${{ inputs.ecsServiceName }}" ]]; then
@@ -66,8 +76,10 @@ jobs:
 
           echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
           echo "service=${SERVICE_NAME}" >> $GITHUB_OUTPUT
+          echo "ecsCluster=${ECS_CLUSTER_NAME}" >> $GITHUB_OUTPUT
 
           echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
+          echo "ECS_CLUSTER_NAME=${ECS_CLUSTER_NAME}" >> $GITHUB_ENV
           echo "SERVICE_NAME=${SERVICE_NAME}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials
@@ -93,6 +105,7 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     env:
+      ECS_CLUSTER_NAME: ${{ needs.setup.outputs.ecsCluster }}
       SERVICE_NAME: ${{ needs.setup.outputs.service }}
       REPO: ${{ needs.setup.outputs.repo }}
     steps:
@@ -143,7 +156,7 @@ jobs:
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ env.SERVICE_NAME }}
-          cluster: ecs-${{ env.ENV }}
+          cluster: ${{ env.ECS_CLUSTER_NAME }}
           wait-for-service-stability: ${{ inputs.waitForServiceStability }}
 
       - name: De-register (latest-1) revision
