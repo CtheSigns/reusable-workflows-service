@@ -8,6 +8,11 @@ on:
         default: false
         type: boolean
         description: skip tests
+      skipMongo:
+        required: false
+        default: false
+        type: boolean
+        description: skip launching MongoDB container when running test job
     secrets:
       MAVEN_GITHUB_TOKEN:
         required: true
@@ -48,6 +53,7 @@ jobs:
           cache: gradle
 
       - name: Start MongoDB
+        if: ${{ !inputs.skipMongo }}
         uses: supercharge/mongodb-github-action@1.7.0
         with:
           mongodb-version: '4.4'
