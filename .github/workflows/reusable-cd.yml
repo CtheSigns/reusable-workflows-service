@@ -63,7 +63,7 @@ jobs:
           fi
 
           if [[ -z "${{ inputs.ecsClusterName }}" ]]; then
-            ECS_CLUSTER_NAME="ecs-${ENV}"
+            ECS_CLUSTER_NAME=ecs-${{ env.ENV }}
           else
             ECS_CLUSTER_NAME=${{ inputs.ecsClusterName }}
           fi
@@ -104,10 +104,11 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     env:
+      ECS_CLUSTER_NAME: ${{ needs.setup.outputs.ecsCluster }}
       SERVICE_NAME: ${{ needs.setup.outputs.service }}
       REPO: ${{ needs.setup.outputs.repo }}
     steps:
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials test
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.awsAccessKey }}
