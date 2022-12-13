@@ -75,7 +75,6 @@ jobs:
           fi
 
           echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
-          echo "ecsCluster=${ECS_CLUSTER_NAME}" >> $GITHUB_OUTPUT
           echo "service=${SERVICE_NAME}" >> $GITHUB_OUTPUT
 
           echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
@@ -105,7 +104,6 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     env:
-      ECS_CLUSTER_NAME: ${{ needs.setup.outputs.ecsCluster }}
       SERVICE_NAME: ${{ needs.setup.outputs.service }}
       REPO: ${{ needs.setup.outputs.repo }}
     steps:
