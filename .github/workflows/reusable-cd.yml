@@ -105,7 +105,6 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     env:
-      ECS_CLUSTER_NAME: ${{ needs.setup.outputs.ecsCluster }}
       SERVICE_NAME: ${{ needs.setup.outputs.service }}
       REPO: ${{ needs.setup.outputs.repo }}
     steps:
@@ -156,7 +155,7 @@ jobs:
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
           service: ${{ env.SERVICE_NAME }}
-          cluster: ${{ env.ECS_CLUSTER_NAME }}
+          cluster: ${{ needs.setup.outputs.ecsCluster }}
           wait-for-service-stability: ${{ inputs.waitForServiceStability }}
 
       - name: De-register (latest-1) revision
