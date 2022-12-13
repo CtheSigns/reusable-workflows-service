@@ -75,6 +75,7 @@ jobs:
           fi
 
           echo "repo=${GITHUB_REPOSITORY,,}" >> $GITHUB_OUTPUT
+          echo "ecsCluster=${ECS_CLUSTER_NAME}" >> $GITHUB_OUTPUT
           echo "service=${SERVICE_NAME}" >> $GITHUB_OUTPUT
 
           echo "REPO=${GITHUB_REPOSITORY,,}" >> $GITHUB_ENV
@@ -108,7 +109,7 @@ jobs:
       SERVICE_NAME: ${{ needs.setup.outputs.service }}
       REPO: ${{ needs.setup.outputs.repo }}
     steps:
-      - name: Configure AWS credentials test
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.awsAccessKey }}
