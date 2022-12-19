@@ -6,6 +6,16 @@ name: Reusable CI
 on:
   workflow_call:
     inputs:
+      javaVersion:
+        required: false
+        type: string
+        defalut: 11
+        descrition: version of Java for runnign tests & building image
+      mongoVersion:
+        required: false
+        type: string
+        defalut: 4.4
+        descrition: version of Mongo DB for running tests
       skipTests:
         required: false
         default: false
@@ -40,7 +50,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'microsoft'
-          java-version: '11'
+          java-version: ${{ inputs.javaVersion }}
           cache: gradle
 
       - name: Compile Java
@@ -60,13 +70,13 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'microsoft'
-          java-version: '11'
+          java-version: ${{ inputs.javaVersion }}
           cache: gradle
 
       - name: Start MongoDB
-        uses: supercharge/mongodb-github-action@1.7.0
+        uses: supercharge/mongodb-github-action@1.8.0
         with:
-          mongodb-version: '4.4'
+          mongodb-version: ${{ inputs.mongoVersion }}
 
       - name: Caching /build/*
         uses: actions/cache@v3
@@ -117,7 +127,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'microsoft'
-          java-version: '11'
+          java-version: ${{ inputs.javaVersion }}
           cache: gradle
 
       - name: Restoring cache /build/*
